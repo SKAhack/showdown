@@ -855,34 +855,25 @@ var _DoTable = function(text) {
 //
 //  Process Table blocks.
 //
-//  First Header  | Second Header
-//  ------------- | -------------
-//  Content Cell  | Content Cell
-//  Content Cell  | Content Cell
-//
-//  or
+//  Pattern 1
 //
 //  | First Header  | Second Header |
 //  |---------------|---------------|
 //  | Content Cell  | Content Cell  |
 //  | Content Cell  | Content Cell  |
 //
+//  or
+//
+//  Pattern 2
+//
+//  First Header  | Second Header
+//  ------------- | -------------
+//  Content Cell  | Content Cell
+//  Content Cell  | Content Cell
+//
 
-	/*
-		text = text.replace(
-			/
-			(
-				(?:[ \t]*[\|])([^\n]*)\n
-				(?:[ \t]*[\|][\-\|]*)\n
-				(
-					(?:[ \t]*[\|][^\n]*\n)*
-					(?:[ \t]*[\|][^\n]*)+
-				)
-			)
-		/g,function(){...});
-	*/
-	text = text.replace(/((?:[ \t]*[\|])([^\n]*)\n(?:[ \t]*[\|][\-\|]*)\n((?:[ \t]*[\|][^\n]*\n)*(?:[ \t]*[\|][^\n]*)+))/g,
-		function(wholeMatch,m1,m2,m3) {
+	var Table = function(lineRegex) {
+		return function(wholeMatch,m1,m2,m3) {
 			var i = 0, j = 0;
 			m2 = m2.replace(/[\|]\s*$/, "");
 			var headers = m2.split('|');
@@ -901,8 +892,7 @@ var _DoTable = function(text) {
 			tableBlock += "  </tr>\n</thead>\n";
 			tableBlock += "<tbody>\n";
 
-			var lines = m3.replace(/(?:\n|^)[ \t]*[\|]([^\n]*)/g,
-				function(wholeMatch,m1) {
+			var lines = m3.replace(lineRegex, function(wholeMatch,m1) {
 					m1 = m1.replace(/[\|]\s*$/, "");
 					return m1 + "\n";
 				}
@@ -930,6 +920,45 @@ var _DoTable = function(text) {
 			tableBlock += "</table>";
 			return hashBlock(tableBlock) + "\n";
 		}
+	};
+	var replaceTable;
+
+	// Pattern 1
+	/*
+		text = text.replace(
+			/
+			(
+				(?:[ \t]*[\|])([^\n]*)\n
+				(?:[ \t]*[\|][\-\| \t]*)\n
+				(
+					(?:[ \t]*[\|][^\n]*\n)*
+					(?:[ \t]*[\|][^\n]*)+
+				)
+			)
+		/g,function(){...});
+	*/
+	replaceTable = new Table(/(?:\n|^)[ \t]*[\|]([^\n]*)/g);
+	text = text.replace(/((?:[ \t]*[\|])([^\n]*)\n(?:[ \t]*[\|][\-\| \t]*)\n((?:[ \t]*[\|][^\n]*\n)*(?:[ \t]*[\|][^\n]*)+))/g,
+		replaceTable
+	);
+
+	// Pattern 2
+	/*
+		text = text.replace(
+			/
+			(
+				(?:[ \t]*)([^\n]+[\|][^\n]*)\n
+				(?:[ \t]*[\-]+[ ]*[\|][\-\| ]*)\n
+				(
+					(?:[ \t]*[^\n]*[\|][^\n]*\n)*
+					(?:[ \t]*[^\n]*[\|][^\n]*)+
+				)
+			)
+		/g,function(){...});
+	*/
+	replaceTable = new Table(/(?:\n|^)[ \t]*([^\n]*[\|][^\n]*)/g);
+	text = text.replace(/((?:[ \t]*)([^\n]+[\|][^\n]*)\n(?:[ \t]*[\-]+[ ]*[\|][\-\| ]*)\n((?:[ \t]*[^\n]*[\|][^\n]*\n)*(?:[ \t]*[^\n]*[\|][^\n]*)+))/g,
+		replaceTable
 	);
 	return text;
 }
