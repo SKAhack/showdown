@@ -359,6 +359,7 @@ var _RunBlockGamut = function(text) {
 	text = text.replace(/^[ ]{0,2}([ ]?\_[ ]?){3,}[ \t]*$/gm,key);
 
 	text = _DoLists(text);
+	text = _DoTable(text);
 	text = _DoCodeBlocks(text);
 	text = _DoBlockQuotes(text);
 
@@ -849,6 +850,89 @@ _ProcessListItems = function(list_str) {
 	return list_str;
 }
 
+
+var _DoTable = function(text) {
+//
+//  Process Table blocks.
+//
+//  First Header  | Second Header
+//  ------------- | -------------
+//  Content Cell  | Content Cell
+//  Content Cell  | Content Cell
+//
+//  or
+//
+//  | First Header  | Second Header |
+//  |---------------|---------------|
+//  | Content Cell  | Content Cell  |
+//  | Content Cell  | Content Cell  |
+//
+
+	/*
+		text = text.replace(
+			/
+			(
+				(?:[ \t]*[\|])([^\n]*)\n
+				(?:[ \t]*[\|][\-\|]*)\n
+				(
+					(?:[ \t]*[\|][^\n]*\n)*
+					(?:[ \t]*[\|][^\n]*)+
+				)
+			)
+		/g,function(){...});
+	*/
+	text = text.replace(/((?:[ \t]*[\|])([^\n]*)\n(?:[ \t]*[\|][\-\|]*)\n((?:[ \t]*[\|][^\n]*\n)*(?:[ \t]*[\|][^\n]*)+))/g,
+		function(wholeMatch,m1,m2,m3) {
+			var i = 0, j = 0;
+			m2 = m2.replace(/[\|]\s*$/, "");
+			var headers = m2.split('|');
+			var tableBlock = "";
+
+			tableBlock += "<table>\n";
+			tableBlock += "<thead>\n  <tr>\n";
+
+			if (headers.length !== 1 || headers[0] !== '') {
+				for (i = 0; i < headers.length; i++) {
+					var _headers = _RunSpanGamut(headers[i].replace(/(^\s+)|(\s+$)/g, ""));
+					tableBlock += "    <th>" + _headers + "</th>\n";
+				}
+			}
+
+			tableBlock += "  </tr>\n</thead>\n";
+			tableBlock += "<tbody>\n";
+
+			var lines = m3.replace(/(?:\n|^)[ \t]*[\|]([^\n]*)/g,
+				function(wholeMatch,m1) {
+					m1 = m1.replace(/[\|]\s*$/, "");
+					return m1 + "\n";
+				}
+			).split("\n");
+			lines = lines.splice(0, lines.length - 1);
+
+			for (i = 0; i < lines.length; i++) {
+				tableBlock += "  <tr>\n";
+
+				var bodies = lines[i].split('|');
+				if (headers.length < bodies.length) {
+					bodies = bodies.splice(0, headers.length - 1).concat(bodies.join('|'));
+				}
+				if (bodies.length !== 1 || bodies[0] !== '') {
+					for (j = 0; j < bodies.length; j++) {
+						var _body = _RunSpanGamut(bodies[j].replace(/(^\s+)|(\s+$)/g, ""));
+						tableBlock += "    <td>" + _body + "</td>\n";
+					}
+				}
+
+				tableBlock += "  </tr>\n";
+			}
+
+			tableBlock += "</tbody>\n";
+			tableBlock += "</table>";
+			return hashBlock(tableBlock) + "\n";
+		}
+	);
+	return text;
+}
 
 var _DoCodeBlocks = function(text) {
 //
