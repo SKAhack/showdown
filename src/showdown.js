@@ -131,12 +131,13 @@ this.makeHtml = function(text) {
 	// contorted like /[ \t]*\n+/ .
 	text = text.replace(/^[ \t]+$/mg,"");
 
+
 	// Handle github codeblocks prior to running HashHTML so that
 	// HTML contained within the codeblock gets escaped propertly
 	text = _DoGithubCodeBlocks(text);
 
 	// Turn block-level HTML blocks into hash entries
-	text = _HashHTMLBlocks(text);
+	text = _HashHTMLBlocks(text, hashElement2);
 
 	// Strip link definitions, store in hashes.
 	text = _StripLinkDefinitions(text);
@@ -205,9 +206,11 @@ var _StripLinkDefinitions = function(text) {
 }
 
 
-var _HashHTMLBlocks = function(text) {
+var _HashHTMLBlocks = function(text, hashFunc) {
 	// attacklab: Double up blank lines to reduce lookaround
 	text = text.replace(/\n/g,"\n\n");
+
+  hashFunc = hashFunc || hashElement;
 
 	// Hashify HTML blocks:
 	// We only want to do this for block-level HTML tags, such as headers,
@@ -245,7 +248,7 @@ var _HashHTMLBlocks = function(text) {
 		)						// attacklab: there are sentinel newlines at end of document
 		/gm,function(){...}};
 	*/
-	text = text.replace(/^(<(p|div|h[1-6]|blockquote|pre|table|dl|ol|ul|script|noscript|form|fieldset|iframe|math|ins|del)\b[^\r]*?\n<\/\2>[ \t]*(?=\n+))/gm,hashElement);
+	text = text.replace(/^(<(p|div|h[1-6]|blockquote|pre|table|dl|ol|ul|script|noscript|form|fieldset|iframe|math|ins|del)\b[^\r]*?\n<\/\2>[ \t]*(?=\n+))/gm,hashFunc);
 
 	//
 	// Now match more liberally, simply from `\n<tag>` to `</tag>\n`
@@ -265,7 +268,7 @@ var _HashHTMLBlocks = function(text) {
 		)						// attacklab: there are sentinel newlines at end of document
 		/gm,function(){...}};
 	*/
-	text = text.replace(/^(<(p|div|h[1-6]|blockquote|pre|table|dl|ol|ul|script|noscript|form|fieldset|iframe|math|style|section|header|footer|nav|article|aside)\b[^\r]*?.*<\/\2>[ \t]*(?=\n+)\n)/gm,hashElement);
+	text = text.replace(/^(<(p|div|h[1-6]|blockquote|pre|table|dl|ol|ul|script|noscript|form|fieldset|iframe|math|style|section|header|footer|nav|article|aside)\b[^\r]*?.*<\/\2>[ \t]*(?=\n+)\n)/gm,hashFunc);
 
 	// Special case just for <hr />. It was easier to make a special case than
 	// to make the other regex more complicated.
@@ -284,7 +287,7 @@ var _HashHTMLBlocks = function(text) {
 		)
 		/g,hashElement);
 	*/
-	text = text.replace(/(\n[ ]{0,3}(<(hr)\b([^<>])*?\/?>)[ \t]*(?=\n{2,}))/g,hashElement);
+	text = text.replace(/(\n[ ]{0,3}(<(hr)\b([^<>])*?\/?>)[ \t]*(?=\n{2,}))/g,hashFunc);
 
 	// Special case for standalone HTML comments:
 
@@ -301,7 +304,7 @@ var _HashHTMLBlocks = function(text) {
 		)
 		/g,hashElement);
 	*/
-	text = text.replace(/(\n\n[ ]{0,3}<!(--[^\r]*?--\s*)+>[ \t]*(?=\n{2,}))/g,hashElement);
+	text = text.replace(/(\n\n[ ]{0,3}<!(--[^\r]*?--\s*)+>[ \t]*(?=\n{2,}))/g,hashFunc);
 
 	// PHP and ASP-style processor instructions (<?...?> and <%...%>)
 
@@ -322,7 +325,7 @@ var _HashHTMLBlocks = function(text) {
 		)
 		/g,hashElement);
 	*/
-	text = text.replace(/(?:\n\n)([ ]{0,3}(?:<([?%])[^\r]*?\2>)[ \t]*(?=\n{2,}))/g,hashElement);
+	text = text.replace(/(?:\n\n)([ ]{0,3}(?:<([?%])[^\r]*?\2>)[ \t]*(?=\n{2,}))/g,hashFunc);
 
 	// attacklab: Undo double lines (see comment at top of this function)
 	text = text.replace(/\n\n/g,"\n");
@@ -341,6 +344,22 @@ var hashElement = function(wholeMatch,m1) {
 
 	// Replace the element text with a marker ("~KxK" where x is its key)
 	blockText = "\n\n~K" + (g_html_blocks.push(blockText)-1) + "K\n\n";
+
+	return blockText;
+};
+
+var hashElement2 = function(wholeMatch,m1) {
+	var blockText = m1;
+
+	// Undo double lines
+	blockText = blockText.replace(/\n\n/g,"\n");
+	blockText = blockText.replace(/^\n/,"");
+
+	// strip trailing blank lines
+	blockText = blockText.replace(/\n+$/g,"");
+
+	// Replace the element text with a marker ("~KxK" where x is its key)
+	blockText = "\n\n~J" + (g_html_blocks.push(blockText)-1) + "J\n\n";
 
 	return blockText;
 };
@@ -1212,6 +1231,9 @@ var _FormParagraphs = function(text) {
 		if (str.search(/~K(\d+)K/g) >= 0) {
 			grafsOut.push(str);
 		}
+		else if (str.search(/~J(\d+)J/g) >= 0) {
+			grafsOut.push(str);
+		}
 		else if (str.search(/\S/) >= 0) {
 			str = _RunSpanGamut(str);
 			str = str.replace(/^([ \t]*)/g,"<p>");
@@ -1231,6 +1253,12 @@ var _FormParagraphs = function(text) {
 			var blockText = g_html_blocks[RegExp.$1];
 			blockText = blockText.replace(/\$/g,"$$$$"); // Escape any dollar signs
 			grafsOut[i] = grafsOut[i].replace(/~K\d+K/,blockText);
+		}
+		while (grafsOut[i].search(/~J(\d+)J/) >= 0) {
+			var blockText = g_html_blocks[RegExp.$1];
+			blockText = blockText.replace(/\$/g,"$$$$"); // Escape any dollar signs
+			grafsOut[i] = grafsOut[i].replace(/~J\d+J/,blockText);
+			grafsOut[i] = grafsOut[i].replace(/<(\/?)([^>]+)>/g,"&lt;$1$2&gt;");
 		}
 	}
 
