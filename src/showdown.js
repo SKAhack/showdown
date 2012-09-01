@@ -80,6 +80,7 @@ Showdown.converter = function() {
 
 // Global hashes, used by various utility routines
 var g_urls;
+var g_links;
 var g_titles;
 var g_html_blocks;
 
@@ -101,6 +102,7 @@ this.makeHtml = function(text) {
 	// one article (e.g. an index page that shows the N most recent
 	// articles):
 	g_urls = new Array();
+	g_links = new Array();
 	g_titles = new Array();
 	g_html_blocks = new Array();
 
@@ -138,6 +140,7 @@ this.makeHtml = function(text) {
 
 	// Turn block-level HTML blocks into hash entries
 	text = _HashHTMLBlocks(text, hashElement2);
+
 
 	// Strip link definitions, store in hashes.
 	text = _StripLinkDefinitions(text);
@@ -203,14 +206,13 @@ var _StripLinkDefinitions = function(text) {
 	);
 
 	return text;
-}
-
+};
 
 var _HashHTMLBlocks = function(text, hashFunc) {
 	// attacklab: Double up blank lines to reduce lookaround
 	text = text.replace(/\n/g,"\n\n");
 
-  hashFunc = hashFunc || hashElement;
+	hashFunc = hashFunc || hashElement;
 
 	// Hashify HTML blocks:
 	// We only want to do this for block-level HTML tags, such as headers,
@@ -330,7 +332,7 @@ var _HashHTMLBlocks = function(text, hashFunc) {
 	// attacklab: Undo double lines (see comment at top of this function)
 	text = text.replace(/\n\n/g,"\n");
 	return text;
-}
+};
 
 var hashElement = function(wholeMatch,m1) {
 	var blockText = m1;
@@ -414,6 +416,8 @@ var _RunSpanGamut = function(text) {
 	text = _DoAutoLinks(text);
 	text = _EncodeAmpsAndAngles(text);
 	text = _DoItalicsAndBold(text);
+
+	text = _UnhashLinks(text);
 
 	// Do hard breaks:
 	text = text.replace(/  +\n/g," <br />\n");
@@ -567,7 +571,7 @@ var writeAnchorTag = function(wholeMatch,m1,m2,m3,m4,m5,m6,m7) {
 
 	result += ">" + link_text + "</a>";
 
-	return result;
+	return "~L" + (g_links.push(result) - 1) + "L";
 }
 
 
@@ -671,7 +675,7 @@ var writeImageTag = function(wholeMatch,m1,m2,m3,m4,m5,m6,m7) {
 
 	result += " />";
 
-	return result;
+	return "~L" + (g_links.push(result) - 1) + "L";
 }
 
 
@@ -1304,7 +1308,14 @@ var _EncodeBackslashEscapes = function(text) {
 
 var _DoAutoLinks = function(text) {
 
-	text = text.replace(/<((https?|ftp|dict):[^'">\s]+)>/gi,"<a href=\"$1\">$1</a>");
+	text = text.replace(/<(((?:https?|ftp):\/\/?|www[.])(?:[-_.!~*'a-zA-Z0-9;\/?:\@&=+\$,%#]|(?:\([\w\d]+\)))+\/?)>/gi,
+		function(wholeMatch,m1){
+			return "~L" + (g_links.push("<a href=\""+m1+"\">"+m1+"</a>") - 1) + "L"
+	});
+	text = text.replace(/(((?:https?|ftp):\/\/?|www[.])(?:[-_.!~*'a-zA-Z0-9;\/?:\@&=+\$,%#]|(?:\([\w\d]+\)))+\/?)/gi,
+		function(wholeMatch,m1){
+			return "~L" + (g_links.push("<a href=\""+m1+"\">"+m1+"</a>") - 1) + "L"
+	});
 
 	// Email addresses: <address@domain.foo>
 
@@ -1327,7 +1338,15 @@ var _DoAutoLinks = function(text) {
 	);
 
 	return text;
-}
+};
+
+var _UnhashLinks = function(text) {
+	text = text.replace(/(~L(\d+)L)/g, function(wholeMatch,m1,m2){
+		return g_links[m2];
+	});
+
+	return text;
+};
 
 
 var _EncodeEmailAddress = function(addr) {
