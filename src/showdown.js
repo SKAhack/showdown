@@ -1308,13 +1308,28 @@ var _EncodeBackslashEscapes = function(text) {
 
 var _DoAutoLinks = function(text) {
 
+	// youtube link
+	text = text.replace(/((?:https?):\/\/(?:www[.])?youtube.com\/watch\?(?:[\w\d]+=[-_.!~*'a-zA-Z0-9;\/?:\@&=+\$,%#]+&)*v=([^&\s]+)(?:&[\w\d]+=[-_.!~*'a-zA-Z0-9;\/?:\@&=+\$,%#]+)*\/?)/gi,
+		function(wholeMatch,m1,m2){
+			var result = '<iframe width="560" height="315" src="http://www.youtube.com/embed/'+m2+'" frameborder="0" allowfullscreen></iframe>';
+			return "~L" + (g_links.push(result) - 1) + "L";
+	});
+
+	// vimeo link
+	text = text.replace(/((?:https?):\/\/(?:www[.])?vimeo.com\/(\d+)(?:[-_.!~*'a-zA-Z0-9;\/?:\@&=+\$,%#])*)/gi,
+		function(wholeMatch,m1,m2){
+			var result = '<iframe src="http://player.vimeo.com/video/'+m2+'?color=ff0179" width="530" height="298" frameborder="0" webkitAllowFullScreen mozallowfullscreen allowFullScreen></iframe>';
+			return "~L" + (g_links.push(result) - 1) + "L";
+	});
+
 	text = text.replace(/<(((?:https?|ftp):\/\/?|www[.])(?:[-_.!~*'a-zA-Z0-9;\/?:\@&=+\$,%#]|(?:\([\w\d]+\)))+\/?)>/gi,
 		function(wholeMatch,m1){
-			return "~L" + (g_links.push("<a href=\""+m1+"\">"+m1+"</a>") - 1) + "L"
+			return "~L" + (g_links.push("<a href=\""+m1+"\">"+m1+"</a>") - 1) + "L";
 	});
+
 	text = text.replace(/(((?:https?|ftp):\/\/?|www[.])(?:[-_.!~*'a-zA-Z0-9;\/?:\@&=+\$,%#]|(?:\([\w\d]+\)))+\/?)/gi,
 		function(wholeMatch,m1){
-			return "~L" + (g_links.push("<a href=\""+m1+"\">"+m1+"</a>") - 1) + "L"
+			return "~L" + (g_links.push("<a href=\""+m1+"\">"+m1+"</a>") - 1) + "L";
 	});
 
 	// Email addresses: <address@domain.foo>
